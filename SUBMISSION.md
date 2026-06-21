@@ -187,8 +187,8 @@ If ordered by `updated_at`, editing an old product would re-sort it to the top �
 ### Why Set-Based Seed Script?
 `INSERT ... SELECT FROM generate_series(1, 200000)` loads 200k rows in ~2-3 seconds (no per-row round trips). Building indexes **after** the insert is faster than maintaining them incrementally.
 
-### Why Vanilla JS + Tailwind CDN?
-No build tooling, no transpiler — just fetch and render. Task brief says "design it entirely with AI if you want; we don't grade UI code." Kept it simple and fast.
+### Why Vanilla JS + Custom CSS?
+No build tooling, no transpiler, no CDN dependency — just HTML, vanilla JS fetch(), and a hand-written style.css. Task brief says "design it entirely with AI if you want; we don't grade UI code." Kept it simple, fast, and dependency-free. The UI includes a Three.js particle network background, GSAP staggered card animations, and glassmorphism cards.
 
 ## Correctness & Performance
 
