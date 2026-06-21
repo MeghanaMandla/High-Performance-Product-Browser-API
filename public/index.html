@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Catalog — 200,000 products</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/3.4.1/tailwind.min.js"></script>
+<style>
+  :root {
+    --bg: #f6f4ef;
+    --surface: #ffffff;
+    --ink: #18181b;
+    --ink-dim: #6b6b70;
+    --accent: #b65c2e;
+    --line: #e7e3da;
+  }
+  html.dark {
+    --bg: #15151a;
+    --surface: #1d1d23;
+    --ink: #f2f1ec;
+    --ink-dim: #97969e;
+    --accent: #e08a52;
+    --line: #2a2a32;
+  }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+    transition: background 0.4s ease, color 0.4s ease;
+  }
+  .mono { font-family: 'SF Mono', 'JetBrains Mono', Menlo, monospace; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    transform-style: preserve-3d;
+    transition: transform 0.12s ease-out, box-shadow 0.12s ease-out, border-color 0.3s, background 0.3s;
+    will-change: transform;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card-enter {
+    opacity: 0;
+    transform: translateY(14px);
+    animation: cardIn 0.5s ease forwards;
+  }
+  @keyframes cardIn { to { opacity: 1; transform: translateY(0); } }
+  .ripple {
+    position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+    clip-path: circle(0% at var(--rx, 50%) var(--ry, 50%));
+  }
+  .ripple.go { transition: clip-path 0.6s cubic-bezier(.7,0,.3,1); clip-path: circle(150% at var(--rx, 50%) var(--ry, 50%)); }
+  ::-webkit-scrollbar { width: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 6px; }
+</style>
+</head>
+<body class="min-h-screen">
+
+  <!-- theme-sweep overlay, see toggleTheme() -->
+  <div id="ripple" class="ripple"></div>
+
+  <header class="sticky top-0 z-40 backdrop-blur border-b" style="background: color-mix(in srgb, var(--bg) 88%, transparent); border-color: var(--line);">
+    <div class="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between gap-4">
+      <div>
+        <p class="text-xs tracking-[0.2em] uppercase mono" style="color: var(--accent);">Catalog</p>
+        <h1 class="text-2xl" style="letter-spacing:-0.01em;">200,000 products, newest first</h1>
+      </div>
+      <div class="flex items-center gap-3">
+        <select id="categorySelect"
+          class="mono text-sm px-3 py-2 rounded-md border bg-transparent outline-none cursor-pointer"
+          style="border-color: var(--line); color: var(--ink);">
+          <option value="">All categories</option>
+        </select>
+        <button id="themeToggle" aria-label="Toggle theme"
+          class="w-10 h-10 rounded-full border flex items-center justify-center text-lg"
+          style="border-color: var(--line);">🌙</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 py-8">
+    <div class="flex items-center justify-between mb-5 text-sm mono" style="color: var(--ink-dim);">
+      <span id="statusLine">loading…</span>
+    </div>
+
+    <div id="grid" class="grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));"></div>
+
+    <div class="flex justify-center my-10">
+      <button id="loadMoreBtn"
+        class="mono text-sm px-5 py-2.5 rounded-full border hover:opacity-80 transition disabled:opacity-40"
+        style="border-color: var(--accent); color: var(--accent);">
+        Load more
+      </button>
+    </div>
+    <div id="sentinel" class="h-1"></div>
+  </main>
+
+<script>
+(function () {
+  'use strict';
+
+  const grid = document.getElementById('grid');
+  const statusLine = document.getElementById('statusLine');
+  const loadMoreBtn = document.getElementById('loadMoreBtn');
+  const categorySelect = document.getElementById('categorySelect');
+  const themeToggle = document.getElementById('themeToggle');
+  const ripple = document.getElementById('ripple');
+
+  const PAGE_SIZE = 24;
+  let nextCursor = null;
+  let loading = false;
+  let exhausted = false;
+  let currentCategory = '';
+  let totalLoaded = 0;
+
+  function fmtPrice(p) {
+    return '$' + Number(p).toFixed(2);
+  }
+
+  function fmtDate(iso) {
+    const d = new Date(iso);
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
+  function cardHTML(p) {
+    return `
+      <div class="card rounded-xl p-4 card-enter">
+        <p class="text-[11px] mono uppercase tracking-wider mb-2" style="color: var(--accent);">${escapeHTML(p.category)}</p>
+        <h3 class="text-base leading-snug mb-3">${escapeHTML(p.name)}</h3>
+        <div class="flex items-end justify-between">
+          <span class="text-xl mono">${fmtPrice(p.price)}</span>
+          <span class="text-[11px] mono" style="color: var(--ink-dim);">${fmtDate(p.created_at)}</span>
+        </div>
+        <p class="text-[10px] mono mt-2" style="color: var(--ink-dim);">#${p.id}</p>
+      </div>`;
+  }
+
+  function escapeHTML(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+
+  // Lightweight 3D tilt on hover — only attached to cards currently in view.
+  function attachTilt(el) {
+    el.addEventListener('mousemove', (e) => {
+      const r = el.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - 0.5;
+      const y = (e.clientY - r.top) / r.height - 0.5;
+      el.style.transform = `perspective(700px) rotateX(${(-y * 8).toFixed(2)}deg) rotateY(${(x * 8).toFixed(2)}deg) scale(1.02)`;
+    });
+    el.addEventListener('mouseleave', () => {
+      el.style.transform = 'perspective(700px) rotateX(0) rotateY(0) scale(1)';
+    });
+  }
+
+  async function fetchPage() {
+    if (loading || exhausted) return;
+    loading = true;
+    loadMoreBtn.disabled = true;
+    statusLine.textContent = `loading… (${totalLoaded} shown)`;
+
+    const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
+    if (currentCategory) params.set('category', currentCategory);
+    if (nextCursor) params.set('next_cursor', nextCursor);
+
+    try {
+      const res = await fetch('/api/products?' + params.toString());
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+
+      const frag = document.createDocumentFragment();
+      data.data.forEach((p, i) => {
+        const wrap = document.createElement('div');
+        wrap.innerHTML = cardHTML(p);
+        const card = wrap.firstElementChild;
+        card.style.animationDelay = (i * 25) + 'ms';
+        attachTilt(card);
+        frag.appendChild(card);
+      });
+      grid.appendChild(frag);
+
+      totalLoaded += data.data.length;
+      nextCursor = data.next_cursor;
+      exhausted = !data.has_more;
+      loadMoreBtn.classList.toggle('hidden', exhausted);
+      statusLine.textContent = exhausted
+        ? `${totalLoaded} products shown — that's all for this filter`
+        : `${totalLoaded} products shown`;
+    } catch (err) {
+      statusLine.textContent = 'Failed to load products: ' + err.message;
+    } finally {
+      loading = false;
+      loadMoreBtn.disabled = false;
+    }
+  }
+
+  function resetAndLoad() {
+    grid.innerHTML = '';
+    nextCursor = null;
+    exhausted = false;
+    totalLoaded = 0;
+    loadMoreBtn.classList.remove('hidden');
+    fetchPage();
+  }
+
+  loadMoreBtn.addEventListener('click', fetchPage);
+
+  // Infinite scroll via IntersectionObserver, with the button as a manual fallback.
+  const observer = new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting) fetchPage();
+  }, { rootMargin: '600px' });
+  observer.observe(document.getElementById('sentinel'));
+
+  categorySelect.addEventListener('change', () => {
+    currentCategory = categorySelect.value;
+    resetAndLoad();
+  });
+
+  async function loadCategories() {
+    try {
+      const res = await fetch('/api/categories');
+      const data = await res.json();
+      data.categories.forEach((c) => {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        categorySelect.appendChild(opt);
+      });
+    } catch (err) {
+      console.error('Failed to load categories', err);
+    }
+  }
+
+  // Theme toggle with a radial clip-path sweep emanating from the button.
+  function toggleTheme(e) {
+    const isDark = document.documentElement.classList.contains('dark');
+    const rect = themeToggle.getBoundingClientRect();
+    const rx = ((rect.left + rect.width / 2) / window.innerWidth) * 100;
+    const ry = ((rect.top + rect.height / 2) / window.innerHeight) * 100;
+    ripple.style.setProperty('--rx', rx + '%');
+    ripple.style.setProperty('--ry', ry + '%');
+    ripple.style.background = isDark ? '#f6f4ef' : '#15151a';
+
+    ripple.classList.add('go');
+    setTimeout(() => {
+      document.documentElement.classList.toggle('dark');
+      themeToggle.textContent = document.documentElement.classList.contains('dark') ? '☀️' : '🌙';
+    }, 280);
+    setTimeout(() => {
+      ripple.classList.remove('go');
+      ripple.style.clipPath = 'circle(0% at 50% 50%)';
+    }, 620);
+  }
+  themeToggle.addEventListener('click', toggleTheme);
+
+  loadCategories();
+  fetchPage();
+})();
+</script>
+</body>
+</html>
