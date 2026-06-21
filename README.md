@@ -9,7 +9,7 @@ while data is being written concurrently.
 - **Node.js + Express** — backend API
 - **PostgreSQL** (Neon/Supabase free tier in production) — single table, two
   composite B-Tree indexes
-- **Vanilla HTML/JS + Tailwind (CDN)** — bonus UI, no build step
+- **Vanilla HTML/JS + Custom CSS** — bonus UI, no build step, no CDN dependency
 
 ## Why these choices
 

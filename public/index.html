@@ -1,260 +1,356 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Catalog — 200,000 products</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/3.4.1/tailwind.min.js"></script>
-<style>
-  :root {
-    --bg: #f6f4ef;
-    --surface: #ffffff;
-    --ink: #18181b;
-    --ink-dim: #6b6b70;
-    --accent: #b65c2e;
-    --line: #e7e3da;
-  }
-  html.dark {
-    --bg: #15151a;
-    --surface: #1d1d23;
-    --ink: #f2f1ec;
-    --ink-dim: #97969e;
-    --accent: #e08a52;
-    --line: #2a2a32;
-  }
-  body {
-    background: var(--bg);
-    color: var(--ink);
-    font-family: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
-    transition: background 0.4s ease, color 0.4s ease;
-  }
-  .mono { font-family: 'SF Mono', 'JetBrains Mono', Menlo, monospace; }
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--line);
-    transform-style: preserve-3d;
-    transition: transform 0.12s ease-out, box-shadow 0.12s ease-out, border-color 0.3s, background 0.3s;
-    will-change: transform;
-  }
-  .card:hover { border-color: var(--accent); }
-  .card-enter {
-    opacity: 0;
-    transform: translateY(14px);
-    animation: cardIn 0.5s ease forwards;
-  }
-  @keyframes cardIn { to { opacity: 1; transform: translateY(0); } }
-  .ripple {
-    position: fixed; inset: 0; pointer-events: none; z-index: 9999;
-    clip-path: circle(0% at var(--rx, 50%) var(--ry, 50%));
-  }
-  .ripple.go { transition: clip-path 0.6s cubic-bezier(.7,0,.3,1); clip-path: circle(150% at var(--rx, 50%) var(--ry, 50%)); }
-  ::-webkit-scrollbar { width: 10px; }
-  ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 6px; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Product Catalog — 200,000 products</title>
+  <link rel="stylesheet" href="/style.css" />
 </head>
-<body class="min-h-screen">
+<body>
 
-  <!-- theme-sweep overlay, see toggleTheme() -->
-  <div id="ripple" class="ripple"></div>
+  <!-- Three.js renders here (fixed, z-index 0) -->
+  <canvas id="bg"></canvas>
 
-  <header class="sticky top-0 z-40 backdrop-blur border-b" style="background: color-mix(in srgb, var(--bg) 88%, transparent); border-color: var(--line);">
-    <div class="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between gap-4">
-      <div>
-        <p class="text-xs tracking-[0.2em] uppercase mono" style="color: var(--accent);">Catalog</p>
-        <h1 class="text-2xl" style="letter-spacing:-0.01em;">200,000 products, newest first</h1>
-      </div>
-      <div class="flex items-center gap-3">
-        <select id="categorySelect"
-          class="mono text-sm px-3 py-2 rounded-md border bg-transparent outline-none cursor-pointer"
-          style="border-color: var(--line); color: var(--ink);">
-          <option value="">All categories</option>
-        </select>
-        <button id="themeToggle" aria-label="Toggle theme"
-          class="w-10 h-10 rounded-full border flex items-center justify-center text-lg"
-          style="border-color: var(--line);">🌙</button>
-      </div>
-    </div>
-  </header>
-
-  <main class="max-w-6xl mx-auto px-6 py-8">
-    <div class="flex items-center justify-between mb-5 text-sm mono" style="color: var(--ink-dim);">
-      <span id="statusLine">loading…</span>
-    </div>
-
-    <div id="grid" class="grid gap-4" style="grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));"></div>
-
-    <div class="flex justify-center my-10">
-      <button id="loadMoreBtn"
-        class="mono text-sm px-5 py-2.5 rounded-full border hover:opacity-80 transition disabled:opacity-40"
-        style="border-color: var(--accent); color: var(--accent);">
-        Load more
-      </button>
-    </div>
-    <div id="sentinel" class="h-1"></div>
-  </main>
-
-<script>
-(function () {
-  'use strict';
-
-  const grid = document.getElementById('grid');
-  const statusLine = document.getElementById('statusLine');
-  const loadMoreBtn = document.getElementById('loadMoreBtn');
-  const categorySelect = document.getElementById('categorySelect');
-  const themeToggle = document.getElementById('themeToggle');
-  const ripple = document.getElementById('ripple');
-
-  const PAGE_SIZE = 24;
-  let nextCursor = null;
-  let loading = false;
-  let exhausted = false;
-  let currentCategory = '';
-  let totalLoaded = 0;
-
-  function fmtPrice(p) {
-    return '$' + Number(p).toFixed(2);
-  }
-
-  function fmtDate(iso) {
-    const d = new Date(iso);
-    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-  }
-
-  function cardHTML(p) {
-    return `
-      <div class="card rounded-xl p-4 card-enter">
-        <p class="text-[11px] mono uppercase tracking-wider mb-2" style="color: var(--accent);">${escapeHTML(p.category)}</p>
-        <h3 class="text-base leading-snug mb-3">${escapeHTML(p.name)}</h3>
-        <div class="flex items-end justify-between">
-          <span class="text-xl mono">${fmtPrice(p.price)}</span>
-          <span class="text-[11px] mono" style="color: var(--ink-dim);">${fmtDate(p.created_at)}</span>
+  <!-- All UI sits above the canvas -->
+  <div class="overlay">
+    <header class="site-header" id="siteHeader">
+      <div class="header-inner">
+        <div>
+          <p class="header-eyebrow">Catalog</p>
+          <h1 class="header-title">200,000 products</h1>
         </div>
-        <p class="text-[10px] mono mt-2" style="color: var(--ink-dim);">#${p.id}</p>
-      </div>`;
-  }
+        <div>
+          <select id="categorySelect" class="category-select">
+            <option value="">All categories</option>
+          </select>
+        </div>
+      </div>
+    </header>
 
-  function escapeHTML(s) {
-    return String(s).replace(/[&<>"']/g, (c) => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[c]));
-  }
+    <main class="site-main">
+      <p class="status-line" id="statusLine">Initializing…</p>
+      <div id="grid" class="product-grid"></div>
+      <div class="load-more-wrap">
+        <button id="loadMoreBtn" class="load-more-btn">Load more</button>
+      </div>
+      <div id="sentinel" style="height:1px"></div>
+    </main>
+  </div>
 
-  // Lightweight 3D tilt on hover — only attached to cards currently in view.
-  function attachTilt(el) {
-    el.addEventListener('mousemove', (e) => {
-      const r = el.getBoundingClientRect();
-      const x = (e.clientX - r.left) / r.width - 0.5;
-      const y = (e.clientY - r.top) / r.height - 0.5;
-      el.style.transform = `perspective(700px) rotateX(${(-y * 8).toFixed(2)}deg) rotateY(${(x * 8).toFixed(2)}deg) scale(1.02)`;
-    });
-    el.addEventListener('mouseleave', () => {
-      el.style.transform = 'perspective(700px) rotateX(0) rotateY(0) scale(1)';
-    });
-  }
+  <!-- Three.js r128 (global THREE) -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <!-- GSAP 3 (global gsap) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 
-  async function fetchPage() {
-    if (loading || exhausted) return;
-    loading = true;
-    loadMoreBtn.disabled = true;
-    statusLine.textContent = `loading… (${totalLoaded} shown)`;
+  <script>
+  /* ================================================================
+     THREE.JS — interactive particle network background
+     ================================================================ */
+  (function initThree() {
+    const canvas   = document.getElementById('bg');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
 
-    const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
-    if (currentCategory) params.set('category', currentCategory);
-    if (nextCursor) params.set('next_cursor', nextCursor);
+    const scene  = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.z = 10;
 
-    try {
-      const res = await fetch('/api/products?' + params.toString());
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const data = await res.json();
+    /* ---- particles ---- */
+    const COUNT     = 1500;
+    const positions = new Float32Array(COUNT * 3);
+    const colors    = new Float32Array(COUNT * 3);
 
-      const frag = document.createDocumentFragment();
-      data.data.forEach((p, i) => {
-        const wrap = document.createElement('div');
-        wrap.innerHTML = cardHTML(p);
-        const card = wrap.firstElementChild;
-        card.style.animationDelay = (i * 25) + 'ms';
-        attachTilt(card);
-        frag.appendChild(card);
-      });
-      grid.appendChild(frag);
-
-      totalLoaded += data.data.length;
-      nextCursor = data.next_cursor;
-      exhausted = !data.has_more;
-      loadMoreBtn.classList.toggle('hidden', exhausted);
-      statusLine.textContent = exhausted
-        ? `${totalLoaded} products shown — that's all for this filter`
-        : `${totalLoaded} products shown`;
-    } catch (err) {
-      statusLine.textContent = 'Failed to load products: ' + err.message;
-    } finally {
-      loading = false;
-      loadMoreBtn.disabled = false;
+    for (let i = 0; i < COUNT; i++) {
+      positions[i*3]   = (Math.random() - 0.5) * 22;
+      positions[i*3+1] = (Math.random() - 0.5) * 22;
+      positions[i*3+2] = (Math.random() - 0.5) * 22;
+      // 70 % cyan  /  30 % violet
+      if (Math.random() < 0.7) {
+        colors[i*3] = 0.0; colors[i*3+1] = 0.83; colors[i*3+2] = 1.0;
+      } else {
+        colors[i*3] = 0.66; colors[i*3+1] = 0.33; colors[i*3+2] = 0.97;
+      }
     }
-  }
 
-  function resetAndLoad() {
-    grid.innerHTML = '';
-    nextCursor = null;
-    exhausted = false;
-    totalLoaded = 0;
-    loadMoreBtn.classList.remove('hidden');
+    const ptGeo = new THREE.BufferGeometry();
+    ptGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    ptGeo.setAttribute('color',    new THREE.BufferAttribute(colors,    3));
+
+    const ptMat = new THREE.PointsMaterial({
+      size: 0.07,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.75,
+      sizeAttenuation: true,
+    });
+
+    const pts = new THREE.Points(ptGeo, ptMat);
+    scene.add(pts);
+
+    /* ---- connecting lines (computed once, added after first frame) ----
+       O(n²) distance check over 1500 points runs ~100 ms; deferred to
+       requestIdleCallback so it never blocks the first render.            */
+    const lineMat = new THREE.LineBasicMaterial({
+      color: 0x00d4ff,
+      transparent: true,
+      opacity: 0.07,
+    });
+
+    function buildLines() {
+      const LINK_SQ = 2.6 * 2.6;
+      const verts   = [];
+      for (let i = 0; i < COUNT; i++) {
+        for (let j = i + 1; j < COUNT; j++) {
+          const dx = positions[i*3]   - positions[j*3];
+          const dy = positions[i*3+1] - positions[j*3+1];
+          const dz = positions[i*3+2] - positions[j*3+2];
+          if (dx*dx + dy*dy + dz*dz < LINK_SQ) {
+            verts.push(
+              positions[i*3], positions[i*3+1], positions[i*3+2],
+              positions[j*3], positions[j*3+1], positions[j*3+2]
+            );
+          }
+        }
+      }
+      const lineGeo = new THREE.BufferGeometry();
+      lineGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
+      const lines = new THREE.LineSegments(lineGeo, lineMat);
+      scene.add(lines);
+      // Keep lines in sync with particle rotation
+      pts.userData.lines = lines;
+    }
+
+    (window.requestIdleCallback || (fn => setTimeout(fn, 100)))(buildLines);
+
+    /* ---- mouse → camera parallax ---- */
+    let targetX = 0, targetY = 0;
+    window.addEventListener('mousemove', (e) => {
+      targetX =  (e.clientX / window.innerWidth  - 0.5) * 1.2;
+      targetY = -(e.clientY / window.innerHeight - 0.5) * 1.2;
+    });
+
+    /* ---- raycaster: highlight particles near cursor ---- */
+    const raycaster = new THREE.Raycaster();
+    raycaster.params.Points = { threshold: 0.8 };
+    const mouse2d = new THREE.Vector2();
+    const origColors = new Float32Array(colors); // save originals
+
+    window.addEventListener('mousemove', (e) => {
+      mouse2d.x =  (e.clientX / window.innerWidth)  * 2 - 1;
+      mouse2d.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    });
+
+    let highlightFrame = 0;
+    function updateHighlight() {
+      // Only run every 4 frames for performance
+      if (++highlightFrame % 4 !== 0) return;
+
+      raycaster.setFromCamera(mouse2d, camera);
+      const hits = raycaster.intersectObject(pts);
+
+      const colorAttr = ptGeo.attributes.color;
+      // Restore original colors
+      for (let i = 0; i < COUNT; i++) {
+        colorAttr.setXYZ(i, origColors[i*3], origColors[i*3+1], origColors[i*3+2]);
+      }
+      // Brighten particles near the hit
+      if (hits.length > 0) {
+        const center = hits[0].index;
+        const R = 80; // how many index-neighbors to brighten
+        for (let k = Math.max(0, center - R); k < Math.min(COUNT, center + R); k++) {
+          colorAttr.setXYZ(k, 0.6, 1.0, 1.0);
+        }
+      }
+      colorAttr.needsUpdate = true;
+    }
+
+    /* ---- resize ---- */
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    /* ---- animation loop ---- */
+    (function loop() {
+      requestAnimationFrame(loop);
+
+      pts.rotation.y += 0.0007;
+      pts.rotation.x += 0.0002;
+
+      if (pts.userData.lines) {
+        pts.userData.lines.rotation.y = pts.rotation.y;
+        pts.userData.lines.rotation.x = pts.rotation.x;
+      }
+
+      // Smooth camera drift toward mouse
+      camera.position.x += (targetX * 0.4 - camera.position.x) * 0.025;
+      camera.position.y += (targetY * 0.4 - camera.position.y) * 0.025;
+      camera.lookAt(0, 0, 0);
+
+      updateHighlight();
+      renderer.render(scene, camera);
+    })();
+  })();
+
+
+  /* ================================================================
+     PRODUCT CATALOG — fetch, render, paginate with GSAP animations
+     ================================================================ */
+  (function initApp() {
+    'use strict';
+
+    const grid        = document.getElementById('grid');
+    const statusLine  = document.getElementById('statusLine');
+    const loadMoreBtn = document.getElementById('loadMoreBtn');
+    const catSelect   = document.getElementById('categorySelect');
+
+    const PAGE_SIZE = 24;
+    let nextCursor  = null;
+    let loading     = false;
+    let exhausted   = false;
+    let currentCat  = '';
+    let total       = 0;
+
+    function fmtPrice(p) {
+      return '$' + Number(p).toFixed(2);
+    }
+    function fmtDate(iso) {
+      return new Date(iso).toLocaleDateString(undefined, {
+        year: 'numeric', month: 'short', day: 'numeric',
+      });
+    }
+    function esc(s) {
+      return String(s).replace(/[&<>"']/g, (c) => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+      ));
+    }
+
+    function makeCard(p) {
+      const el = document.createElement('div');
+      el.className = 'card';
+      el.innerHTML = `
+        <span class="card-category">${esc(p.category)}</span>
+        <h3 class="card-name">${esc(p.name)}</h3>
+        <div class="card-footer">
+          <span class="card-price">${fmtPrice(p.price)}</span>
+          <span class="card-date">${fmtDate(p.created_at)}</span>
+        </div>
+        <span class="card-id">#${p.id}</span>
+      `;
+      // GSAP hover — lift + cyan glow
+      el.addEventListener('mouseenter', () =>
+        gsap.to(el, {
+          y: -7, scale: 1.025,
+          boxShadow: '0 0 32px rgba(0,212,255,0.28), 0 10px 36px rgba(0,0,0,0.55)',
+          duration: 0.22, ease: 'power2.out',
+        })
+      );
+      el.addEventListener('mouseleave', () =>
+        gsap.to(el, {
+          y: 0, scale: 1,
+          boxShadow: '0 2px 16px rgba(0,0,0,0.3)',
+          duration: 0.3, ease: 'power2.out',
+        })
+      );
+      return el;
+    }
+
+    async function fetchPage() {
+      if (loading || exhausted) return;
+      loading = true;
+      loadMoreBtn.disabled = true;
+      statusLine.textContent = `Loading… (${total.toLocaleString()} shown)`;
+
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
+      if (currentCat)  params.set('category',    currentCat);
+      if (nextCursor)  params.set('next_cursor',  nextCursor);
+
+      try {
+        const res  = await fetch('/api/products?' + params);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+
+        const cards = data.data.map(makeCard);
+        cards.forEach(c => grid.appendChild(c));
+
+        // GSAP staggered fade-in + slide-up
+        gsap.fromTo(cards,
+          { opacity: 0, y: 32 },
+          { opacity: 1, y: 0, duration: 0.5, stagger: 0.04, ease: 'power2.out' }
+        );
+
+        total     += data.data.length;
+        nextCursor = data.next_cursor;
+        exhausted  = !data.has_more;
+
+        loadMoreBtn.classList.toggle('hidden', exhausted);
+        statusLine.textContent = exhausted
+          ? `${total.toLocaleString()} products — end of catalog`
+          : `${total.toLocaleString()} products shown`;
+
+      } catch (err) {
+        statusLine.textContent = 'Failed to load: ' + err.message;
+      } finally {
+        loading = false;
+        loadMoreBtn.disabled = false;
+      }
+    }
+
+    function resetAndLoad() {
+      const existing = Array.from(grid.children);
+      if (existing.length) {
+        // GSAP scale-down old cards before clearing
+        gsap.to(existing, {
+          scale: 0.88, opacity: 0, duration: 0.18, stagger: 0.008, ease: 'power1.in',
+          onComplete() {
+            grid.innerHTML = '';
+            nextCursor = null;
+            exhausted  = false;
+            total      = 0;
+            loadMoreBtn.classList.remove('hidden');
+            fetchPage();
+          },
+        });
+      } else {
+        nextCursor = null;
+        exhausted  = false;
+        total      = 0;
+        loadMoreBtn.classList.remove('hidden');
+        fetchPage();
+      }
+    }
+
+    loadMoreBtn.addEventListener('click', fetchPage);
+    catSelect.addEventListener('change', () => {
+      currentCat = catSelect.value;
+      resetAndLoad();
+    });
+
+    // Infinite scroll sentinel
+    new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) fetchPage(); },
+      { rootMargin: '600px' }
+    ).observe(document.getElementById('sentinel'));
+
+    // Populate category dropdown
+    fetch('/api/categories')
+      .then(r => r.json())
+      .then(d => {
+        d.categories.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = opt.textContent = c;
+          catSelect.appendChild(opt);
+        });
+      })
+      .catch(console.error);
+
+    // Header slides in on load
+    gsap.from('#siteHeader', { y: -50, opacity: 0, duration: 0.9, ease: 'power3.out' });
+
     fetchPage();
-  }
-
-  loadMoreBtn.addEventListener('click', fetchPage);
-
-  // Infinite scroll via IntersectionObserver, with the button as a manual fallback.
-  const observer = new IntersectionObserver((entries) => {
-    if (entries[0].isIntersecting) fetchPage();
-  }, { rootMargin: '600px' });
-  observer.observe(document.getElementById('sentinel'));
-
-  categorySelect.addEventListener('change', () => {
-    currentCategory = categorySelect.value;
-    resetAndLoad();
-  });
-
-  async function loadCategories() {
-    try {
-      const res = await fetch('/api/categories');
-      const data = await res.json();
-      data.categories.forEach((c) => {
-        const opt = document.createElement('option');
-        opt.value = c;
-        opt.textContent = c;
-        categorySelect.appendChild(opt);
-      });
-    } catch (err) {
-      console.error('Failed to load categories', err);
-    }
-  }
-
-  // Theme toggle with a radial clip-path sweep emanating from the button.
-  function toggleTheme(e) {
-    const isDark = document.documentElement.classList.contains('dark');
-    const rect = themeToggle.getBoundingClientRect();
-    const rx = ((rect.left + rect.width / 2) / window.innerWidth) * 100;
-    const ry = ((rect.top + rect.height / 2) / window.innerHeight) * 100;
-    ripple.style.setProperty('--rx', rx + '%');
-    ripple.style.setProperty('--ry', ry + '%');
-    ripple.style.background = isDark ? '#f6f4ef' : '#15151a';
-
-    ripple.classList.add('go');
-    setTimeout(() => {
-      document.documentElement.classList.toggle('dark');
-      themeToggle.textContent = document.documentElement.classList.contains('dark') ? '☀️' : '🌙';
-    }, 280);
-    setTimeout(() => {
-      ripple.classList.remove('go');
-      ripple.style.clipPath = 'circle(0% at 50% 50%)';
-    }, 620);
-  }
-  themeToggle.addEventListener('click', toggleTheme);
-
-  loadCategories();
-  fetchPage();
-})();
-</script>
+  })();
+  </script>
 </body>
 </html>

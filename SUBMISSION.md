@@ -10,7 +10,7 @@ A fast, correct API for browsing ~200,000 products with cursor-based pagination 
 
 - **Backend**: Node.js + Express
 - **Database**: PostgreSQL (Neon/Supabase free tier)
-- **Bonus UI**: Vanilla JS + Tailwind CSS (CDN, no build step)
+- **Bonus UI**: Vanilla JS + Custom CSS (no build step, no CDN dependency)
 - **Proof of Correctness**: Node.js SQLite simulation (`validate.js`)
 
 ## The Problem Solved
@@ -116,23 +116,16 @@ The service will be live at a URL like `https://your-service.onrender.com`
 
 ### 3. Seed the Database
 
-Once Render is running and `DATABASE_URL` is set, seed the database by visiting:
-```
-https://your-service.onrender.com/api/products?limit=1
-```
-
-This will fail (no rows yet), but you can check the backend logs to see if it can connect to Postgres. If yes, run:
+Run the seed script locally with `DATABASE_URL` pointing at your Neon database:
 
 ```bash
-curl -X POST https://your-service.onrender.com/seed
-```
-
-Or SSH into the Render shell and run:
-```bash
+# From your local machine, with .env containing the Neon DATABASE_URL:
 npm run seed
 ```
 
-(Alternatively, seed locally with `npm run seed` while connected to the same `DATABASE_URL`.)
+This creates the `products` table and inserts 200,000 rows in a few seconds using a single set-based `INSERT … SELECT FROM generate_series(1, 200000)`.
+
+Alternatively, open the Render service's **Shell** tab and run `npm run seed` there.
 
 ## API Endpoints
 

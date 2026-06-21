@@ -1,6 +1,10 @@
-// validate.js — throwaway verification script, run locally with `node validate.js`.
-// Uses node's built-in :memory: SQLite (same row-value comparison semantics as
-// Postgres) to prove out the pagination logic before wiring it to real Postgres.
+// validate.js — run with `node validate.js` (requires Node >= 22.5.0).
+// Uses Node's built-in :memory: SQLite (same row-value comparison semantics as
+// Postgres) to prove the pagination logic is correct before wiring to real Postgres.
+//
+// Suppress the "SQLite is experimental" warning — we know, and it's fine for a
+// local validation script.
+process.removeAllListeners('warning');
 const { DatabaseSync } = require('node:sqlite');
 const db = new DatabaseSync(':memory:');
 

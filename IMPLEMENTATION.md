@@ -24,11 +24,12 @@ Built a fast, correct cursor-paginated product catalog API supporting 200,000 pr
 - Indexes built **after** data load (faster than building incrementally)
 - `created_at` spread across ~2.3 years with higher id = later timestamp, mirroring real-world insertion patterns
 
-### UI: Vanilla JS + Tailwind (CDN)
-- No build step required — just HTML + vanilla JS fetch()
+### UI: Vanilla JS + Custom CSS
+- No build step, no CDN dependency — just HTML + vanilla JS fetch() + a single style.css
 - Infinite scroll via IntersectionObserver, manual "Load more" button fallback
 - Light 3D tilt effect on hover (CSS transform)
 - Theme toggle with radial clip-path animation
+- Dark mode via CSS custom properties (design tokens), toggled with a class on `<html>`
 
 ## The Hard Problem: Pagination Under Concurrent Writes
 
