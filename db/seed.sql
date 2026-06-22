@@ -4,7 +4,7 @@
 -- set-based INSERT (generate_series), then builds indexes afterwards.
 --
 -- Run with:  psql "$DATABASE_URL" -f db/seed.sql
--- or:        npm run seed   (see db/run-seed.js, does the same thing over `pg`)
+-- or:        python db/seed.py   (runs this file over DATABASE_URL)
 --
 -- Design notes:
 --  - Indexes are created AFTER the bulk insert. Building a B-Tree from

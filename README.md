@@ -189,8 +189,8 @@ checking with `EXPLAIN ANALYZE SELECT ...` against the real 200k-row table.
 
 ### Proof, not just an argument
 
-`validate.js` is a small offline simulation (uses Node's built-in
-`node:sqlite`, which supports the same `(a, b) < (?, ?)` row-value comparison
+`validate.py` is a small offline simulation (uses Python's built-in
+`sqlite3`, which supports the same `(a, b) < (?, ?)` row-value comparison
 Postgres does) that:
 
 1. Seeds 1,000 rows, paginates with the keyset query, and injects 50 new
@@ -247,9 +247,9 @@ keyset cursor (and the "newest first" requirement) depends on.
   catalog, but would matter if rows were ever per-user).
 - Add a composite index variant for a price-sort mode if that filter were
   needed, and a `pg_trgm` index if free-text name search were added later.
-- Light integration tests against a real Postgres (e.g. via `pg-mem` or a
-  Dockerized Postgres) rather than the `node:sqlite` simulation, which proves
-  the *algorithm* but not Postgres-specific planner behavior.
+- Light integration tests against a real Postgres (e.g. via a Dockerized
+  Postgres) rather than the `sqlite3` simulation, which proves the *algorithm*
+  but not Postgres-specific planner behavior.
 
 ## How I used AI
 
