@@ -43,24 +43,51 @@ npm run seed                # creates table + 200,000 rows + indexes
 npm start                   # http://localhost:3000
 ```
 
-## The API
+## API Endpoints
 
-```
-GET /api/products?limit=20&category=Books&next_cursor=<opaque string>
-```
+### `GET /api/products`
+
+| Parameter | Required | Default | Description |
+|---|---|---|---|
+| `limit` | No | 20 (max 100) | Results per page |
+| `category` | No | — | Filter by category name |
+| `next_cursor` | No | — | Pagination cursor from previous response |
 
 Response:
 
 ```json
 {
-  "data": [ { "id": 1, "name": "...", "category": "...", "price": "..", "created_at": "...", "updated_at": "..." } ],
-  "next_cursor": "eyJjcmVhdGVkX2F0Ijoi...",
+  "data": [
+    {
+      "id": 42,
+      "name": "Product 42",
+      "category": "Books",
+      "price": "19.99",
+      "created_at": "2024-01-15T12:34:56Z",
+      "updated_at": "2024-01-15T12:34:56Z"
+    }
+  ],
+  "next_cursor": "eyJjcmVhdGVkX2F0IjoiMjAyNC0wMS0xNVQxMjozNDo1NloiLCJpZCI6NDJ9",
   "has_more": true
 }
 ```
 
 `next_cursor` is opaque to the client — just pass back whatever you were
 given. Internally it's the last row's `(created_at, id)`.
+
+### `GET /api/categories`
+
+Returns all distinct product categories.
+
+```json
+{ "categories": ["Automotive", "Beauty", "Books", "Clothing", "Electronics", "..."] }
+```
+
+### `GET /api/health`
+
+```json
+{ "status": "ok" }
+```
 
 ---
 
