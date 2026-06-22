@@ -1,12 +1,12 @@
 # Product Catalog — 200k products, fast cursor-paginated browsing
 
-A small Express + Postgres backend that lets someone browse ~200,000 products
+A small FastAPI + Postgres backend that lets someone browse ~200,000 products
 newest-first, filter by category, and paginate through them — correctly, even
 while data is being written concurrently.
 
 ## Stack
 
-- **Node.js + Express** — backend API
+- **Python + FastAPI** — backend API
 - **PostgreSQL** (Neon/Supabase free tier in production) — single table, two
   composite B-Tree indexes
 - **Vanilla HTML/JS + Custom CSS** — bonus UI, no build step, no CDN dependency
@@ -16,31 +16,31 @@ while data is being written concurrently.
 Postgres because the core requirement — "paginate correctly while rows are
 being inserted/updated" — is fundamentally about index-backed ordering
 guarantees, and Postgres' composite B-Tree indexes plus support for row-value
-comparisons (`(created_at, id) < (?, ?)`) make keyset pagination both simple
-to write and provably correct. Express because the task is a thin, well
-understood HTTP layer over one query — nothing here calls for a heavier
-framework. No ORM: there's exactly one query that matters and it needs to be
+comparisons (`(created_at, id) < (%s, %s)`) make keyset pagination both simple
+to write and provably correct. FastAPI because it is a thin, well-understood
+HTTP layer over one query — lightweight and fast with automatic API docs at
+`/docs`. No ORM: there's exactly one query that matters and it needs to be
 exactly right, so it's hand-written SQL with parameterized inputs.
 
 ## Project layout
 
 ```
 db/seed.sql        DDL + bulk seed (200k rows) + indexes — single script
-db/run-seed.js      Runs seed.sql over DATABASE_URL (no psql CLI needed)
-src/db.js           pg connection pool
-src/cursor.js        opaque base64url cursor encode/decode
-src/server.js       Express app, GET /api/products, /api/categories
-public/index.html   bonus UI (not graded, see task brief)
-validate.js          offline proof-of-correctness simulation (see below)
+db/seed.py         Runs seed.sql over DATABASE_URL (no psql CLI needed)
+src/db.py          psycopg2 connection pool
+src/cursor.py      opaque base64url cursor encode/decode
+src/server.py      FastAPI app: GET /api/products, /api/categories, /api/health
+public/index.html  bonus UI (not graded, see task brief)
+validate.py        offline proof-of-correctness simulation (see below)
 ```
 
 ## Running locally
 
 ```bash
-npm install
-cp .env.example .env        # fill in DATABASE_URL from Neon/Supabase
-npm run seed                # creates table + 200,000 rows + indexes
-npm start                   # http://localhost:3000
+pip install -r requirements.txt
+cp .env.example .env                    # fill in DATABASE_URL from Neon/Supabase
+python db/seed.py                       # creates table + 200,000 rows + indexes
+uvicorn src.server:app --reload         # http://localhost:8000
 ```
 
 ## API Endpoints
@@ -200,7 +200,7 @@ Postgres does) that:
    show it actually does duplicate rows under the same conditions.
 
 ```bash
-node validate.js
+python validate.py
 ```
 
 ```
@@ -230,9 +230,10 @@ keyset cursor (and the "newest first" requirement) depends on.
 
 - **Database**: [Neon](https://neon.tech) or [Supabase](https://supabase.com)
   free tier Postgres. Copy the connection string into `DATABASE_URL`, run
-  `npm run seed` once against it.
+  `python db/seed.py` once against it.
 - **Backend**: [Render](https://render.com) free web service — connect the
-  repo, build command `npm install`, start command `npm start`, add the
+  repo, set build command to `pip install -r requirements.txt`, start command
+  to `uvicorn src.server:app --host 0.0.0.0 --port $PORT`, add the
   `DATABASE_URL` env var.
 
 ## What I'd improve with more time

@@ -1,10 +1,11 @@
-node_modules/
 .env
-.env.local
 .DS_Store
 *.log
-dist/
-build/
-.vscode/
-.idea/
-.env*.local
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.pytest_cache/
