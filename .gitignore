@@ -1,11 +1,29 @@
+# Environment
 .env
-.DS_Store
-*.log
+.env.local
+.env*.local
 
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
-.venv/
+*.pyd
+.Python
+env/
 venv/
-.pytest_cache/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# OS / IDE
+.DS_Store
+*.log
+.vscode/
+.idea/
+
+# Claude Code
+.claude/
+
+# Node (legacy)
+node_modules/
